@@ -1228,7 +1228,7 @@ namespace Topten.RichTextKit
                 return;
 
             // Get the typeface
-            var typeface = TypefaceFromStyle(style);
+            using var typeface = TypefaceFromStyle(style);
 
             // Get the slice of code points
             var codePointsSlice = _codePoints.SubSlice(start, length);
@@ -1559,7 +1559,7 @@ namespace Topten.RichTextKit
                     if (fr.Direction != _resolvedBaseDirection)
                     {
                         // What is this a fallback for?
-                        var asFallbackFor = TypefaceFromStyle(fr.Style, false);
+                        using var asFallbackFor = TypefaceFromStyle(fr.Style, false);
 
                         // Create a new font run over the same text span but using the base direction
                         _fontRuns[i] = CreateFontRun(fr.StyleRun, fr.CodePoints, _resolvedBaseDirection, fr.Style, fr.Typeface, asFallbackFor);
@@ -1900,7 +1900,7 @@ namespace Topten.RichTextKit
         FontRun CreateEllipsisRun(FontRun basedOn)
         {
             // Get the type face
-            var typeface = TypefaceFromStyle(basedOn.Style, true);
+            using var typeface = TypefaceFromStyle(basedOn.Style, true);
 
             // Split into font fallback runs (there should only ever be just one)
             var fontRun = FontFallback.GetFontRuns(ellipsis.AsSlice(), typeface).Single();
