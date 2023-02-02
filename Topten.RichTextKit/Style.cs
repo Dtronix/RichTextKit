@@ -24,7 +24,7 @@ namespace Topten.RichTextKit
     /// A basic implementation of IStyle interface provides styling 
     /// information for a run of text.
     /// </summary>
-    public class Style : IStyle
+    public class Style : IStyle, IEquatable<Style>
     {
         void CheckNotSealed()
         {
@@ -295,6 +295,73 @@ namespace Topten.RichTextKit
                 TextDirection = textDirection ?? this.TextDirection,
                 ReplacementCharacter = replacementCharacter ?? this.ReplacementCharacter,
             };
+        }
+
+        public bool Equals(Style other)
+        {
+            return 
+                _sealed == other._sealed 
+                && _fontFamily == other._fontFamily 
+                && _fontSize.Equals(other._fontSize)
+                && _fontWeight == other._fontWeight 
+                && _fontWidth == other._fontWidth 
+                && _fontItalic == other._fontItalic 
+                && _underlineStyle == other._underlineStyle
+                && _strikeThrough == other._strikeThrough
+                && _lineHeight.Equals(other._lineHeight) 
+                && _textColor.Equals(other._textColor) 
+                && _backgroundColor.Equals(other._backgroundColor) 
+                && _haloColor.Equals(other._haloColor) 
+                && _haloWidth.Equals(other._haloWidth) 
+                && _haloBlur.Equals(other._haloBlur) 
+                && _letterSpacing.Equals(other._letterSpacing)
+                && _fontVariant == other._fontVariant
+                && _textDirection == other._textDirection 
+                && _replacementCharacter == other._replacementCharacter;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj))
+            {
+                return false;
+            }
+
+            if (ReferenceEquals(this, obj))
+            {
+                return true;
+            }
+
+            if (obj.GetType() != this.GetType())
+            {
+                return false;
+            }
+
+            return Equals((Style)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            var hashCode = new HashCode();
+            hashCode.Add(_sealed);
+            hashCode.Add(_fontFamily);
+            hashCode.Add(_fontSize);
+            hashCode.Add(_fontWeight);
+            hashCode.Add((int)_fontWidth);
+            hashCode.Add(_fontItalic);
+            hashCode.Add((int)_underlineStyle);
+            hashCode.Add((int)_strikeThrough);
+            hashCode.Add(_lineHeight);
+            hashCode.Add(_textColor);
+            hashCode.Add(_backgroundColor);
+            hashCode.Add(_haloColor);
+            hashCode.Add(_haloWidth);
+            hashCode.Add(_haloBlur);
+            hashCode.Add(_letterSpacing);
+            hashCode.Add((int)_fontVariant);
+            hashCode.Add((int)_textDirection);
+            hashCode.Add(_replacementCharacter);
+            return hashCode.ToHashCode();
         }
     }
 }

@@ -17,6 +17,7 @@ using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Topten.RichTextKit.Utils;
 
 namespace Topten.RichTextKit
 {
@@ -48,13 +49,7 @@ namespace Topten.RichTextKit
                 extraWeight += 100;
             }
 
-            // Get the typeface
-            return SKTypeface.FromFamilyName(
-                style.FontFamily, 
-                (SKFontStyleWeight)(style.FontWeight + extraWeight), 
-                style.FontWidth, 
-                style.FontItalic ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright
-                ) ?? SKTypeface.CreateDefault();
+            return SkTypefaceCache.Default.Get(style, extraWeight);
         }
 
         /// <summary>
