@@ -17,13 +17,13 @@ namespace Topten.RichTextKit.Editor.UndoUnits
 
         public override void Do(TextDocument context)
         {
-            _savedText = _textBlock.Extract(_offset, _length);
-            _textBlock.DeleteText(_offset, _length);
+            _savedText = _textBlock.Text.Extract(_offset, _length);
+            _textBlock.Text.DeleteText(_offset, _length);
         }
 
         public override void Undo(TextDocument context)
         {
-            _textBlock.InsertText(_offset, _savedText);
+            _textBlock.Text.InsertText(_offset, _savedText);
             _savedText = null;
         }
 
@@ -34,9 +34,9 @@ namespace Topten.RichTextKit.Editor.UndoUnits
                 return false;
 
             // Copy the additional text
-            var temp = _textBlock.Extract(_offset - length, length);
+            var temp = _textBlock.Text.Extract(_offset - length, length);
             _savedText.InsertText(0, temp);
-            _textBlock.DeleteText(_offset - length, length);
+            _textBlock.Text.DeleteText(_offset - length, length);
 
             // Update position
             _offset -= length;
@@ -48,13 +48,13 @@ namespace Topten.RichTextKit.Editor.UndoUnits
         public bool ExtendForwardDelete(int length)
         {
             // Don't extend across paragraph boundaries
-            if (_offset + length > _textBlock.Length - 1)
+            if (_offset + length > _textBlock.Text.Length - 1)
                 return false;
 
             // Copy the additional text
-            var temp = _textBlock.Extract(_offset, length);
+            var temp = _textBlock.Text.Extract(_offset, length);
             _savedText.InsertText(_length, temp);
-            _textBlock.DeleteText(_offset, length);
+            _textBlock.Text.DeleteText(_offset, length);
 
             // Update position
             _length += length;
@@ -65,7 +65,7 @@ namespace Topten.RichTextKit.Editor.UndoUnits
         public bool ExtendOvertype(int offset, int length)
         {
             // Don't extend across paragraph boundaries
-            if (_offset + offset + length > _textBlock.Length - 1)
+            if (_offset + offset + length > _textBlock.Text.Length - 1)
                 return false;
 
             // This can happen when a DeleteText unit is retroactively
@@ -75,9 +75,9 @@ namespace Topten.RichTextKit.Editor.UndoUnits
                 _savedText = new StyledText();
 
             // Copy the additional text
-            var temp = _textBlock.Extract(_offset + offset, length);
+            var temp = _textBlock.Text.Extract(_offset + offset, length);
             _savedText.InsertText(_length, temp);
-            _textBlock.DeleteText(_offset + offset, length);
+            _textBlock.Text.DeleteText(_offset + offset, length);
 
             // Update position
             _length += length;

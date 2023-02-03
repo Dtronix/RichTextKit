@@ -19,7 +19,7 @@ namespace Topten.RichTextKit.Editor.UndoUnits
             _removedParagraph = secondPara;
 
             // Copy all text from the second paragraph
-            firstPara.TextBlock.AddText(secondPara.TextBlock);
+            firstPara.TextBlock.Text.AddText(secondPara.TextBlock.Text);
 
             // Remove the joined paragraph
             context._paragraphs.RemoveAt(_paragraphIndex + 1);
@@ -29,7 +29,7 @@ namespace Topten.RichTextKit.Editor.UndoUnits
         {
             // Delete the joined text from the first paragraph
             var firstPara = context._paragraphs[_paragraphIndex];
-            firstPara.TextBlock.DeleteText(_splitPoint, firstPara.TextBlock.Length - _splitPoint);
+            firstPara.TextBlock.Text.DeleteText(_splitPoint, firstPara.TextBlock.Text.Length - _splitPoint);
 
             // Restore the split paragraph
             context._paragraphs.Insert(_paragraphIndex + 1, _removedParagraph);

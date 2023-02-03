@@ -30,7 +30,7 @@ namespace Topten.RichTextKit.Editor
         public TextParagraph(IStyle style)
         {
             _textBlock = new TextBlock();
-            _textBlock.AddText("\u2029", style);
+            _textBlock.Text.AddText("\u2029", style);
         }
 
         // Create a new textblock by copying the content of another
@@ -82,7 +82,7 @@ namespace Topten.RichTextKit.Editor
         public override IReadOnlyList<int> LineIndicies => _textBlock.LineIndicies;
 
         /// <inheritdoc />
-        public override int Length => _textBlock.Length;
+        public override int Length => _textBlock.Text.Length;
 
         /// <inheritdoc />
         public override float ContentWidth => _textBlock.MeasuredWidth;

@@ -123,7 +123,7 @@ namespace Topten.RichTextKit.Editor
                 {
                     foreach (var p in _paragraphs)
                     {
-                        p.TextBlock.ApplyStyle(0, p.TextBlock.Length, _defaultStyle);
+                        p.TextBlock.Text.ApplyStyle(0, p.TextBlock.Text.Length, _defaultStyle);
                     }
                     InvalidateLayout();
                     FireDocumentRedraw();
@@ -415,7 +415,7 @@ namespace Topten.RichTextKit.Editor
                 throw new NotImplementedException();
 
             // Get style from text block
-            return para.TextBlock.GetStyleAtOffset(offset);
+            return para.TextBlock.Text.GetStyleAtOffset(offset);
         }
 
         /// <summary>
@@ -907,7 +907,7 @@ namespace Topten.RichTextKit.Editor
                     throw new NotImplementedException();
 
                 // Add the text
-                buf.Add(para.TextBlock.CodePoints.SubSlice(subrun.Offset, subrun.Length));
+                buf.Add(para.TextBlock.Text.CodePoints.SubSlice(subrun.Offset, subrun.Length));
             }
 
             // In plain text mode, replace paragraph separators with new line characters
@@ -1359,8 +1359,8 @@ namespace Topten.RichTextKit.Editor
                 // Split the paragraph at the insertion point into paragraphs A and B
                 var paraA = para;
                 var paraB = new TextParagraph(para as TextParagraph, indexInParagraph, para.Length);
-                if (para.TextBlock.Length - indexInParagraph - 1 != 0)
-                    _undoManager.Do(new UndoDeleteText(paraA.TextBlock, indexInParagraph, para.TextBlock.Length - indexInParagraph - 1));
+                if (para.TextBlock.Text.Length - indexInParagraph - 1 != 0)
+                    _undoManager.Do(new UndoDeleteText(paraA.TextBlock, indexInParagraph, para.TextBlock.Text.Length - indexInParagraph - 1));
 
                 // Append the first part of the inserted text to the end of paragraph A
                 var firstPart = parts[0];
@@ -1382,7 +1382,7 @@ namespace Topten.RichTextKit.Editor
                 {
                     var betweenPara = new TextParagraph(para as TextParagraph, para.Length - 1, 1);
                     var part = parts[i];
-                    betweenPara.TextBlock.InsertText(0, text.Extract(part.Offset, part.Length));
+                    betweenPara.TextBlock.Text.InsertText(0, text.Extract(part.Offset, part.Length));
                     _undoManager.Do(new UndoInsertParagraph(paraIndex + i, betweenPara));
                 }
             }

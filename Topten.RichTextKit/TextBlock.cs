@@ -26,13 +26,26 @@ namespace Topten.RichTextKit
     /// <summary>
     /// Represents a block of formatted, laid out and measurable text
     /// </summary>
-    public class TextBlock : StyledText
+    public class TextBlock
     {
         /// <summary>
         /// Constructor
         /// </summary>
         public TextBlock()
         {
+        }
+
+        /// <summary>
+        /// This is the styled text that the TextBlock uses during it's layout.
+        /// </summary>
+        public StyledText Text
+        {
+            get => _text;
+            set
+            {
+                _text = value;
+                InvalidateLayout();
+            }
         }
 
         /// <summary>
@@ -193,13 +206,12 @@ namespace Topten.RichTextKit
         /// <summary>
         /// Clear the content of this text block
         /// </summary>
-        public override void Clear()
+        public void Clear()
         {
             // Reset everything
             FontRun.Pool.Value.ReturnAndClear(_fontRuns);
             TextLine.Pool.Value.ReturnAndClear(_lines);
             _textShapingBuffers.Clear();
-            base.Clear();
         }
 
         /// <summary>
@@ -212,6 +224,7 @@ namespace Topten.RichTextKit
         {
             // Create a new text block with the same attributes as this one
             var other = new TextBlock();
+            other.Text = new StyledText();
             other.Alignment = this.Alignment;
             other.BaseDirection = this.BaseDirection;
             other.MaxWidth = this.MaxWidth;
@@ -219,22 +232,15 @@ namespace Topten.RichTextKit
             other.MaxLines = this.MaxLines;
 
             // Copy text to the new paragraph
-            foreach (var subRun in _styleRuns.GetInterectingRuns(from, length))
+            foreach (var subRun in _text.StyleRuns.GetInterectingRuns(from, length))
             {
-                var sr = _styleRuns[subRun.Index];
-                other.AddText(sr.CodePoints.SubSlice(subRun.Offset, subRun.Length), sr.Style);
+                var sr = _text.StyleRuns[subRun.Index];
+                other.Text.AddText(sr.CodePoints.SubSlice(subRun.Offset, subRun.Length), sr.Style);
             }
 
             return other;
         }
-
-        /// <inheritdoc />
-        protected override void OnChanged()
-        {
-            InvalidateLayout();
-            base.OnChanged();
-        }
-
+        
 
         /// <summary>
         /// Appends an ellipsis to this text block
@@ -351,7 +357,7 @@ namespace Topten.RichTextKit
             _truncated = false;
 
             // Only layout if actually have some text
-            if (_codePoints.Length != 0)
+            if (_text.CodePoints.Length != 0)
             {
                 // Build font runs
                 BuildFontRuns();
@@ -736,7 +742,7 @@ namespace Topten.RichTextKit
                 // Find word boundaries (if not already done)
                 if (_wordBoundaryIndicies.Count == 0)
                 {
-                    _wordBoundaryIndicies = WordBoundaryAlgorithm.FindWordBoundaries(_codePoints.AsSlice()).ToList();
+                    _wordBoundaryIndicies = WordBoundaryAlgorithm.FindWordBoundaries(_text.CodePoints.AsSlice()).ToList();
                 }
                 return _wordBoundaryIndicies;
             }
@@ -782,7 +788,7 @@ namespace Topten.RichTextKit
         public CaretInfo GetCaretInfo(CaretPosition position)
         {
             // Empty text block?
-            if (_codePoints.Length == 0 || position.CodePointIndex < 0 || _lines.Count == 0)
+            if (_text.CodePoints.Length == 0 || position.CodePointIndex < 0 || _lines.Count == 0)
             {
                 return CaretInfo.None;
             }
@@ -925,10 +931,10 @@ namespace Topten.RichTextKit
         /// <summary>
         /// Invalidate the layout
         /// </summary>
-        void InvalidateLayout()
+        public void InvalidateLayout()
         {
             // Make sure style runs are valid (debug only)
-            _styleRuns.CheckValid(_codePoints.Length);
+            _text?.StyleRuns.CheckValid(_text.CodePoints.Length);
 
             // Set layout flag
             _needsLayout = true;
@@ -1075,26 +1081,26 @@ namespace Topten.RichTextKit
             // Use the shared Bidi algo instance
             Bidi bidi = Bidi.Instance.Value;
 
-            var originalLength = _codePoints.Length;
+            var originalLength = _text.CodePoints.Length;
             try
             {
                 // Clearn unshaped run buffer
                 _unshapedRuns.Clear();
 
                 // Break supplied text into directionality runs
-                _bidiData.Init(_codePoints.AsSlice(), (sbyte)_baseDirection);
+                _bidiData.Init(_text.CodePoints.AsSlice(), (sbyte)_baseDirection);
 
                 // If we have embedded directional overrides then change those
                 // ranges to neutral
-                if (_hasTextDirectionOverrides)
+                if (_text.HasTextDirectionOverrides)
                 {
                     // Save types
                     _bidiData.SaveTypes();
 
-                    for (int i = 0; i < _styleRuns.Count; i++)
+                    for (int i = 0; i < _text.StyleRuns.Count; i++)
                     {
                         // Get the run
-                        var sr = _styleRuns[i];
+                        var sr = _text.StyleRuns[i];
 
                         // Does it have a direction override?
                         if (sr.Style.TextDirection == TextDirection.Auto)
@@ -1115,16 +1121,16 @@ namespace Topten.RichTextKit
                 _resolvedBaseDirection = (TextDirection)bidi.ResolvedParagraphEmbeddingLevel;
 
                 // Now process the embedded runs
-                if (_hasTextDirectionOverrides)
+                if (_text.HasTextDirectionOverrides)
                 {
                     // Restore types
                     _bidiData.RestoreTypes();
 
                     // Process each run individually
-                    for (int i = 0; i < _styleRuns.Count; i++)
+                    for (int i = 0; i < _text.StyleRuns.Count; i++)
                     {
                         // Get the run
-                        var sr = _styleRuns[i];
+                        var sr = _text.StyleRuns[i];
 
                         // Does it have a direction override?
                         if (sr.Style.TextDirection == TextDirection.Auto)
@@ -1154,38 +1160,38 @@ namespace Topten.RichTextKit
                 var pos = 0;
                 int bidiRun = 0;
                 int styleRun = 0;
-                while (pos < _codePoints.Length)
+                while (pos < _text.CodePoints.Length)
                 {
                     // Move to next bidi/style run
                     if (pos == bidiRuns[bidiRun].End)
                         bidiRun++;
-                    if (pos == _styleRuns[styleRun].End)
+                    if (pos == _text.StyleRuns[styleRun].End)
                         styleRun++;
 
                     // Work out where this run ends
-                    int nextPos = Math.Min(bidiRuns[bidiRun].End, _styleRuns[styleRun].End);
+                    int nextPos = Math.Min(bidiRuns[bidiRun].End, _text.StyleRuns[styleRun].End);
 
                     // Add the run
                     var dir = bidiRuns[bidiRun].Direction == Directionality.L ? TextDirection.LTR : TextDirection.RTL;
-                    AddDirectionalRun(_styleRuns[styleRun], pos, nextPos - pos, dir, _styleRuns[styleRun].Style);
+                    AddDirectionalRun(_text.StyleRuns[styleRun], pos, nextPos - pos, dir, _text.StyleRuns[styleRun].Style);
 
                     // Move to next position
                     pos = nextPos;
                 }
 
                 System.Diagnostics.Debug.Assert(bidiRun == bidiRuns.Count - 1);
-                System.Diagnostics.Debug.Assert(styleRun == _styleRuns.Count - 1);
+                System.Diagnostics.Debug.Assert(styleRun == _text.StyleRuns.Count - 1);
 
                 // Add the final run
                 var dir2 = bidiRuns[bidiRun].Direction == Directionality.L ? TextDirection.LTR : TextDirection.RTL;
-                AddDirectionalRun(_styleRuns[_styleRuns.Count - 1], pos, _codePoints.Length - pos, dir2, _styleRuns[styleRun].Style);
+                AddDirectionalRun(_text.StyleRuns[_text.StyleRuns.Count - 1], pos, _text.CodePoints.Length - pos, dir2, _text.StyleRuns[styleRun].Style);
 
                 // Flush runs
                 FlushUnshapedRuns();
             }
             catch (Exception x)
             {
-                throw new InvalidOperationException($"Exception in BuildFontRuns() with original length of {originalLength} now {_codePoints.Length}, style run count {_styleRuns.Count}, font run count {_fontRuns.Count}, direction overrides: {_hasTextDirectionOverrides}", x);
+                throw new InvalidOperationException($"Exception in BuildFontRuns() with original length of {originalLength} now {_text.CodePoints.Length}, style run count {_text.StyleRuns.Count}, font run count {_fontRuns.Count}, direction overrides: {_text.HasTextDirectionOverrides}", x);
             }
         }
 
@@ -1231,7 +1237,7 @@ namespace Topten.RichTextKit
             using var typeface = TypefaceFromStyle(style);
 
             // Get the slice of code points
-            var codePointsSlice = _codePoints.SubSlice(start, length);
+            var codePointsSlice = _text.CodePoints.SubSlice(start, length);
 
             // Split into font fallback runs
             foreach (var fontRun in FontFallback.GetFontRuns(codePointsSlice, typeface, style.ReplacementCharacter))
@@ -1288,7 +1294,7 @@ namespace Topten.RichTextKit
             {
                 // If there's only one accumulated shape run then we can shape and add it directly
                 var usr = _unshapedRuns[0];
-                _fontRuns.Add(CreateFontRun(usr.styleRun, _codePoints.SubSlice(usr.start, usr.length), usr.direction, usr.style, usr.typeface, usr.asFallbackFor));
+                _fontRuns.Add(CreateFontRun(usr.styleRun, _text.CodePoints.SubSlice(usr.start, usr.length), usr.direction, usr.style, usr.typeface, usr.asFallbackFor));
             }
             else 
             {
@@ -1297,7 +1303,7 @@ namespace Topten.RichTextKit
                 // apart so they're rendered separately with correct style for each piece.
                 var first = _unshapedRuns[0];
                 var last = _unshapedRuns[_unshapedRuns.Count - 1];
-                var spanningRun = CreateFontRun(first.styleRun, _codePoints.SubSlice(first.start, last.start + last.length - first.start), first.direction, first.style, first.typeface, first.asFallbackFor);
+                var spanningRun = CreateFontRun(first.styleRun, _text.CodePoints.SubSlice(first.start, last.start + last.length - first.start), first.direction, first.style, first.typeface, first.asFallbackFor);
 
                 for (int i = 1; i < _unshapedRuns.Count; i++)
                 {
@@ -1318,6 +1324,7 @@ namespace Topten.RichTextKit
         }
 
         List<UnshapedRun> _unshapedRuns = new List<UnshapedRun>();
+        private StyledText _text;
 
         class UnshapedRun
         {
@@ -1364,7 +1371,7 @@ namespace Topten.RichTextKit
             // Create the run
             var fontRun = FontRun.Pool.Value.Get();
             fontRun.StyleRun = styleRun;
-            fontRun.CodePointBuffer = _codePoints;
+            fontRun.CodePointBuffer = _text.CodePoints;
             fontRun.Start = codePoints.Start;
             fontRun.Length = codePoints.Length;
             fontRun.Style = style;
@@ -1387,7 +1394,7 @@ namespace Topten.RichTextKit
         void BreakLines()
         {
             // Work out possible line break positions
-            _lineBreaker.Reset(_codePoints.AsSlice());
+            _lineBreaker.Reset(_text.CodePoints.AsSlice());
             var lineBreakPositions = _lineBreaker.GetBreaks(!_maxWidth.HasValue);
 
             int frIndexStartOfLine = 0;     // Index of the first font run in the current line
@@ -1477,7 +1484,7 @@ namespace Topten.RichTextKit
                     frSplitIndex = frIndex;
                     codePointIndexSplit = fr.FindBreakPosition(room, frSplitIndex == frIndexStartOfLine);
                     codePointIndexWrap = codePointIndexSplit;
-                    while (codePointIndexWrap < _codePoints.Length && UnicodeClasses.LineBreakClass(_codePoints[codePointIndexWrap]) == LineBreakClass.SP)
+                    while (codePointIndexWrap < _text.CodePoints.Length && UnicodeClasses.LineBreakClass(_text.CodePoints[codePointIndexWrap]) == LineBreakClass.SP)
                         codePointIndexWrap++;
                 }
 
@@ -1875,8 +1882,8 @@ namespace Topten.RichTextKit
                     frIndex++;
                     if (frIndex == _fontRuns.Count)
                     {
-                        System.Diagnostics.Debug.Assert(codePointIndex == _codePoints.Length);
-                        return _codePoints.Length;
+                        System.Diagnostics.Debug.Assert(codePointIndex == _text.CodePoints.Length);
+                        return _text.CodePoints.Length;
                     }
                 }
                 else
@@ -1927,7 +1934,7 @@ namespace Topten.RichTextKit
 
             // Don't add ellipsis if the last run actually
             // has all the text...
-            if (!postLayout && lastRun.End == _codePoints.Length)
+            if (!postLayout && lastRun.End == _text.CodePoints.Length)
                 return;
 
             // Remove all trailing whitespace from the line

@@ -67,6 +67,11 @@ namespace Topten.RichTextKit
         public Utf32Buffer CodePoints => _codePoints;
 
         /// <summary>
+        /// True if any style runs have a directionality override.
+        /// </summary>
+        public bool HasTextDirectionOverrides => _hasTextDirectionOverrides;
+
+        /// <summary>
         /// Get the text runs as added by AddText
         /// </summary>
         public IReadOnlyList<StyleRun> StyleRuns

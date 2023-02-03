@@ -19,13 +19,13 @@ namespace Topten.RichTextKit.Editor.UndoUnits
         public bool ShouldAppend(StyledText text)
         {
             // If this is a word boundary then don't extend this unit
-            return !WordBoundaryAlgorithm.IsWordBoundary(_textBlock.CodePoints.SubSlice(0, _offset + _length), text.CodePoints.AsSlice());
+            return !WordBoundaryAlgorithm.IsWordBoundary(_textBlock.Text.CodePoints.SubSlice(0, _offset + _length), text.CodePoints.AsSlice());
         }
 
         public void Append(StyledText text)
         {
             // Insert into the text block
-            _textBlock.InsertText(_offset + _length, text);
+            _textBlock.Text.InsertText(_offset + _length, text);
 
             // Update length
             _length += text.Length;
@@ -34,8 +34,8 @@ namespace Topten.RichTextKit.Editor.UndoUnits
         public void Replace(StyledText text)
         {
             // Insert into the text block
-            _textBlock.DeleteText(_offset, _length);
-            _textBlock.InsertText(_offset, text);
+            _textBlock.Text.DeleteText(_offset, _length);
+            _textBlock.Text.InsertText(_offset, text);
 
             // Update length
             _length = text.Length;
@@ -44,7 +44,7 @@ namespace Topten.RichTextKit.Editor.UndoUnits
         public override void Do(TextDocument context)
         {
             // Insert the text into the text block
-            _textBlock.InsertText(_offset, _text);
+            _textBlock.Text.InsertText(_offset, _text);
 
             // Release our copy of the text
             _text = null;
@@ -53,10 +53,10 @@ namespace Topten.RichTextKit.Editor.UndoUnits
         public override void Undo(TextDocument context)
         {
             // Save a copy of the text being deleted
-            _text = _textBlock.Extract(_offset, _length);
+            _text = _textBlock.Text.Extract(_offset, _length);
 
             // Delete it
-            _textBlock.DeleteText(_offset, _length);
+            _textBlock.Text.DeleteText(_offset, _length);
         }
 
         TextBlock _textBlock;

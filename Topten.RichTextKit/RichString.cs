@@ -1002,7 +1002,7 @@ namespace Topten.RichTextKit
                 // Store code point offset of this paragraph
                 CodePointOffset = ctx.TotalLength;
                 LineOffset = ctx.lineCount;
-                ctx.TotalLength += TextBlock.Length;
+                ctx.TotalLength += TextBlock.Text.Length;
 
                 // Text already truncated?
                 Truncated = ctx.Truncated;
@@ -1114,7 +1114,7 @@ namespace Topten.RichTextKit
 
             public override void Build(BuildContext ctx)
             {
-                ctx.TextBlock.AddText(_text, ctx.StyleManager.CurrentStyle);
+                ctx.TextBlock.Text.AddText(_text, ctx.StyleManager.CurrentStyle);
             }
 
             public override void Build(StringBuilder sb)
