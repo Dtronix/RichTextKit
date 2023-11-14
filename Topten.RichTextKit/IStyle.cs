@@ -71,7 +71,7 @@ namespace Topten.RichTextKit
         /// <summary>
         /// The text color for text in this run.
         /// </summary>
-        SKColor TextColor { get; }
+        SKColor? TextColor { get; }
         
         /// <summary>
         /// The background color of this run.

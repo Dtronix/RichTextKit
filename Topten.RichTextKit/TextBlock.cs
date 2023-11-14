@@ -413,6 +413,7 @@ namespace Topten.RichTextKit
             {
                 Canvas = canvas,
                 Options = options,
+                DefaultTextColor = options.DefaultColor
             };
 
             // Prepare selection

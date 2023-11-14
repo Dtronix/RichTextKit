@@ -116,7 +116,7 @@ namespace Topten.RichTextKit
         /// <summary>
         /// The text color for text in this run (defaults to black).
         /// </summary>
-        public SKColor TextColor
+        public SKColor? TextColor
         {
             get => _textColor;
             set { CheckNotSealed(); _textColor = value; }
@@ -218,7 +218,7 @@ namespace Topten.RichTextKit
         UnderlineStyle _underlineStyle;
         StrikeThroughStyle _strikeThrough;
         float _lineHeight = 1.0f;
-        SKColor _textColor = new SKColor(0xFF000000);
+        SKColor? _textColor;
         SKColor _backgroundColor = SKColor.Empty;
         SKColor _haloColor = SKColor.Empty;
         float _haloWidth = 0f;
