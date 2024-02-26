@@ -619,7 +619,7 @@ namespace Topten.RichTextKit
                 }
 
                 // Setup SKPaint
-                paint.Color = Style.TextColor;
+                paint.Color = Style.TextColor ?? ctx.DefaultTextColor;
 
                 if (Style.HaloColor != SKColor.Empty)
                 {

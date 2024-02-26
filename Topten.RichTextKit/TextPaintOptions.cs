@@ -49,6 +49,8 @@ namespace Topten.RichTextKit
             set;
         }
 
+        public SKColor DefaultColor { get; set; } = new SKColor(0, 0, 0);
+
         /// <summary>
         /// The color to be used for the selection background.
         /// </summary>
