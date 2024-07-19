@@ -13,6 +13,7 @@
 // License for the specific language governing permissions and limitations 
 // under the License.
 
+using DesignViewEngine.Cache;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
@@ -66,14 +67,18 @@ namespace Topten.RichTextKit
         /// <returns>A sequence of runs with unsupported code points replaced by a selected font fallback</returns>
         public static IEnumerable<Run> GetFontRuns(Slice<int> codePoints, SKTypeface typeface, char replacementCharacter = '\0')
         {
-            using var font = new SKFont(typeface);
-
+            
+            var font = SKFontCache.Default.Get(typeface);
+            var metrics = SkTypefaceCache.Default.GetMetrics(typeface);
+            font.Typeface = typeface;
+            
             if (replacementCharacter != '\0')
             {
                 var glyph = font.GetGlyph(replacementCharacter);
                 if (glyph == 0)
                 {
-                    var fallbackTypeface = CharacterMatcher.MatchCharacter(typeface.FamilyName, typeface.FontWeight, typeface.FontWidth, typeface.FontSlant, null, replacementCharacter);
+                    
+                    var fallbackTypeface = CharacterMatcher.MatchCharacter(metrics.FamilyName, metrics.FontWeight, metrics.FontWidth, metrics.FontSlant, null, replacementCharacter);
                     if (fallbackTypeface != null)
                         typeface = fallbackTypeface;
                 }
@@ -84,13 +89,13 @@ namespace Topten.RichTextKit
                     Length = codePoints.Length,
                     Typeface = typeface,
                 };
+                SKFontCache.Default.Return(font);
                 yield break;
             }
 
             // Get glyphs using the top-level typeface
             var glyphs = new ushort[codePoints.Length];
             font.GetGlyphs(codePoints.AsSpan(), glyphs);
-
             // Look for subspans that need font fallback (where glyphs are zero)
             int runStart = 0;
             for (int i = 0; i < codePoints.Length; i++)
@@ -98,8 +103,9 @@ namespace Topten.RichTextKit
                 // Do we need fallback for this character?
                 if (glyphs[i] == 0)
                 {
+
                     // Check if there's a fallback available, if not, might as well continue with the current top-level typeface
-                    var subSpanTypeface = CharacterMatcher.MatchCharacter(typeface.FamilyName, typeface.FontWeight, typeface.FontWidth, typeface.FontSlant, null, codePoints[i]);
+                    var subSpanTypeface = CharacterMatcher.MatchCharacter(metrics.FamilyName, metrics.FontWeight, metrics.FontWidth, metrics.FontSlant, null, codePoints[i]);
                     if (subSpanTypeface == null)
                         continue;
 
@@ -138,7 +144,7 @@ namespace Topten.RichTextKit
                     while (unmatchedLength > 0)
                     {
                         // Find the font fallback using the first character
-                        subSpanTypeface = CharacterMatcher.MatchCharacter(typeface.FamilyName, typeface.FontWeight, typeface.FontWidth, typeface.FontSlant, null, codePoints[unmatchedStart]);
+                        subSpanTypeface = CharacterMatcher.MatchCharacter(metrics.FamilyName, metrics.FontWeight, metrics.FontWidth, metrics.FontSlant, null, codePoints[unmatchedStart]);
                         if (subSpanTypeface == null)
                         {
                             // Reset the glyphs in the rest of the range back to unknown
@@ -193,6 +199,8 @@ namespace Topten.RichTextKit
                     Typeface = typeface,
                 };
             }
+
+            SKFontCache.Default.Return(font);
         }
     }
 }

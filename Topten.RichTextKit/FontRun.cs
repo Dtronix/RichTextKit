@@ -19,6 +19,7 @@ using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using DesignViewEngine.Cache;
 using Topten.RichTextKit.Utils;
 
 namespace Topten.RichTextKit
@@ -600,164 +601,173 @@ namespace Topten.RichTextKit
             if (RunKind == FontRunKind.TrailingWhitespace)
                 return;
 
+            
             // Text 
-            using (var paint = new SKPaint())
-            using (var paintHalo = new SKPaint())
+            var paint = SkPaintCache.Default.Rent();
+            var paintHalo = SkPaintCache.Default.Rent();
+
+            // Work out font variant adjustments
+            float glyphScale = 1;
+            float glyphVOffset = 0;
+            if (Style.FontVariant == FontVariant.SuperScript)
             {
-                // Work out font variant adjustments
-                float glyphScale = 1;
-                float glyphVOffset = 0;
-                if (Style.FontVariant == FontVariant.SuperScript)
-                {
-                    glyphScale = 0.65f;
-                    glyphVOffset = -Style.FontSize * 0.35f;
-                }
-                if (Style.FontVariant == FontVariant.SubScript)
-                {
-                    glyphScale = 0.65f;
-                    glyphVOffset = Style.FontSize * 0.1f;
-                }
+                glyphScale = 0.65f;
+                glyphVOffset = -Style.FontSize * 0.35f;
+            }
+            if (Style.FontVariant == FontVariant.SubScript)
+            {
+                glyphScale = 0.65f;
+                glyphVOffset = Style.FontSize * 0.1f;
+            }
 
-                // Setup SKPaint
-                paint.Color = Style.TextColor ?? ctx.DefaultTextColor;
+            // Setup SKPaint
+            paint.Color = Style.TextColor ?? ctx.DefaultTextColor;
 
-                if (Style.HaloColor != SKColor.Empty)
-                {
-                    paintHalo.Color = Style.HaloColor;
-                    paintHalo.Style = SKPaintStyle.Stroke;
-                    paintHalo.StrokeWidth = Style.HaloWidth;
-                    paintHalo.StrokeCap = SKStrokeCap.Square;
-                    if (Style.HaloBlur > 0)
-                        paintHalo.MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, Style.HaloBlur);
-                }
+            if (Style.HaloColor != SKColor.Empty)
+            {
+                paintHalo.Color = Style.HaloColor;
+                paintHalo.Style = SKPaintStyle.Stroke;
+                paintHalo.StrokeWidth = Style.HaloWidth;
+                paintHalo.StrokeCap = SKStrokeCap.Square;
+                if (Style.HaloBlur > 0)
+                    paintHalo.MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, Style.HaloBlur);
+            }
 
-                unsafe
+            // Create the font
+            var font = SKFontCache.Default.Get(Typeface);
+
+            unsafe
+            {
+                fixed (ushort* pGlyphs = Glyphs.Underlying)
                 {
-                    fixed (ushort* pGlyphs = Glyphs.Underlying)
+                    // Get glyph positions
+                    var glyphPositions = GlyphPositions.ToArray();
+                    
+                    
+                    font.Size = Style.FontSize * glyphScale;
+                    font.Hinting = ctx.Options.Hinting;
+                    font.Edging = ctx.Options.Edging;
+                    font.Subpixel = ctx.Options.SubpixelPositioning;
+
+                    // Create the SKTextBlob (if necessary)
+                    if (_textBlob == null)
                     {
-                        // Get glyph positions
-                        var glyphPositions = GlyphPositions.ToArray();
+                        _textBlob = SKTextBlob.CreatePositioned(
+                            (IntPtr)(pGlyphs + Glyphs.Start),
+                            Glyphs.Length * sizeof(ushort),
+                            SKTextEncoding.GlyphId,
+                            font,
+                            GlyphPositions.AsSpan());
 
-                        // Create the font
-                        if (_font == null)
-                        {
-                            _font = new SKFont(this.Typeface, this.Style.FontSize * glyphScale);
-                        }
-                        _font.Hinting = ctx.Options.Hinting;
-                        _font.Edging = ctx.Options.Edging;
-                        _font.Subpixel = ctx.Options.SubpixelPositioning;
-
-                        // Create the SKTextBlob (if necessary)
                         if (_textBlob == null)
                         {
-                            _textBlob = SKTextBlob.CreatePositioned(
-                                (IntPtr)(pGlyphs + Glyphs.Start),
-                                Glyphs.Length * sizeof(ushort),
-                                SKTextEncoding.GlyphId,
-                                _font,
-                                GlyphPositions.AsSpan());
-
-                            if (_textBlob == null)
-                                return;
+                            SkPaintCache.Default.ReturnReset(paint);
+                            SkPaintCache.Default.ReturnReset(paintHalo);
+                            SKFontCache.Default.Return(font);
+                            return;
                         }
+                    }
 
-                        // Paint underline
-                        if (Style.Underline != UnderlineStyle.None && RunKind == FontRunKind.Normal)
+                    // Paint underline
+                    if (Style.Underline != UnderlineStyle.None && RunKind == FontRunKind.Normal)
+                    {
+                        // Work out underline metrics
+                        float underlineYPos = Line.YCoord + Line.BaseLine + (font.Metrics.UnderlinePosition ?? 0);
+                        if (underlineYPos < Line.YCoord + Line.BaseLine + 1)
+                            underlineYPos = Line.YCoord + Line.BaseLine + 1;
+                        paint.StrokeWidth = font.Metrics.UnderlineThickness ?? 1;
+                        if (paint.StrokeWidth < 1)
+                            paint.StrokeWidth = 1;
+                        paintHalo.StrokeWidth = paint.StrokeWidth + Style.HaloWidth;
+
+                        if (Style.Underline == UnderlineStyle.Gapped)
                         {
-                            // Work out underline metrics
-                            float underlineYPos = Line.YCoord + Line.BaseLine + (_font.Metrics.UnderlinePosition ?? 0);
-                            if (underlineYPos < Line.YCoord + Line.BaseLine + 1)
-                                underlineYPos = Line.YCoord + Line.BaseLine + 1;
-                            paint.StrokeWidth = _font.Metrics.UnderlineThickness ?? 1;
-                            if (paint.StrokeWidth < 1)
-                                paint.StrokeWidth = 1;
-                            paintHalo.StrokeWidth = paint.StrokeWidth + Style.HaloWidth;
+                            // Get intercept positions
+                            var interceptPositions = _textBlob.GetIntercepts(underlineYPos - paint.StrokeWidth / 2, underlineYPos + paint.StrokeWidth);
 
-                            if (Style.Underline == UnderlineStyle.Gapped)
+                            // Paint gapped underlinline
+                            float x = XCoord;
+                            for (int i = 0; i < interceptPositions.Length; i += 2)
                             {
-                                // Get intercept positions
-                                var interceptPositions = _textBlob.GetIntercepts(underlineYPos - paint.StrokeWidth / 2, underlineYPos + paint.StrokeWidth);
-
-                                // Paint gapped underlinline
-                                float x = XCoord;
-                                for (int i = 0; i < interceptPositions.Length; i += 2)
-                                {
-                                    float b = interceptPositions[i] - paint.StrokeWidth;
-                                    if (x < b)
-                                    {
-                                        if (Style.HaloColor != SKColor.Empty)
-                                            ctx.Canvas.DrawLine(new SKPoint(x, underlineYPos), new SKPoint(b, underlineYPos), paintHalo);
-                                        ctx.Canvas.DrawLine(new SKPoint(x, underlineYPos), new SKPoint(b, underlineYPos), paint);
-                                    }
-                                    x = interceptPositions[i + 1] + paint.StrokeWidth;
-                                }
-                                if (x < XCoord + Width)
+                                float b = interceptPositions[i] - paint.StrokeWidth;
+                                if (x < b)
                                 {
                                     if (Style.HaloColor != SKColor.Empty)
-                                        ctx.Canvas.DrawLine(new SKPoint(x, underlineYPos), new SKPoint(XCoord + Width, underlineYPos), paintHalo);
-                                    ctx.Canvas.DrawLine(new SKPoint(x, underlineYPos), new SKPoint(XCoord + Width, underlineYPos), paint);
+                                        ctx.Canvas.DrawLine(new SKPoint(x, underlineYPos), new SKPoint(b, underlineYPos), paintHalo);
+                                    ctx.Canvas.DrawLine(new SKPoint(x, underlineYPos), new SKPoint(b, underlineYPos), paint);
                                 }
+                                x = interceptPositions[i + 1] + paint.StrokeWidth;
                             }
-                            else
+                            if (x < XCoord + Width)
                             {
-                                switch (Style.Underline)
-                                {
-                                    case UnderlineStyle.ImeInput:
-                                        paint.PathEffect = SKPathEffect.CreateDash(new float[] { paint.StrokeWidth, paint.StrokeWidth }, paint.StrokeWidth);
-                                        paintHalo.PathEffect = SKPathEffect.CreateDash(new float[] { paintHalo.StrokeWidth, paintHalo.StrokeWidth }, paintHalo.StrokeWidth);
-                                        break;
-
-                                    case UnderlineStyle.ImeConverted:
-                                        paint.PathEffect = SKPathEffect.CreateDash(new float[] { paint.StrokeWidth, paint.StrokeWidth }, paint.StrokeWidth);
-                                        paintHalo.PathEffect = SKPathEffect.CreateDash(new float[] { paintHalo.StrokeWidth, paintHalo.StrokeWidth }, paintHalo.StrokeWidth);
-                                        break;
-
-                                    case UnderlineStyle.ImeTargetConverted:
-                                        paint.StrokeWidth *= 2;
-                                        paintHalo.StrokeWidth *= 2;
-                                        break;
-
-                                    case UnderlineStyle.ImeTargetNonConverted:
-                                        break;
-                                }
-                                // Paint solid underline
                                 if (Style.HaloColor != SKColor.Empty)
-                                    ctx.Canvas.DrawLine(new SKPoint(XCoord, underlineYPos), new SKPoint(XCoord + Width, underlineYPos), paintHalo);
-                                ctx.Canvas.DrawLine(new SKPoint(XCoord, underlineYPos), new SKPoint(XCoord + Width, underlineYPos), paint);
-                                paint.PathEffect = null;
-                                paintHalo.PathEffect = null;
+                                    ctx.Canvas.DrawLine(new SKPoint(x, underlineYPos), new SKPoint(XCoord + Width, underlineYPos), paintHalo);
+                                ctx.Canvas.DrawLine(new SKPoint(x, underlineYPos), new SKPoint(XCoord + Width, underlineYPos), paint);
                             }
                         }
-
-                        if (Style.HaloColor != SKColor.Empty)
+                        else
                         {
-                            // Paint strikethrough halo behind text
-                            if (Style.StrikeThrough != StrikeThroughStyle.None && RunKind == FontRunKind.Normal)
+                            switch (Style.Underline)
                             {
-                                paintHalo.StrokeWidth = _font.Metrics.StrikeoutThickness ?? 1;
-                                if (paintHalo.StrokeWidth < 1)
-                                    paintHalo.StrokeWidth = 1;
-                                paintHalo.StrokeWidth += Style.HaloWidth;
-                                float strikeYPos = Line.YCoord + Line.BaseLine + (_font.Metrics.StrikeoutPosition ?? 0) + glyphVOffset;
-                                ctx.Canvas.DrawLine(new SKPoint(XCoord, strikeYPos), new SKPoint(XCoord + Width, strikeYPos), paintHalo);
+                                case UnderlineStyle.ImeInput:
+                                    paint.PathEffect = SKPathEffect.CreateDash(new float[] { paint.StrokeWidth, paint.StrokeWidth }, paint.StrokeWidth);
+                                    paintHalo.PathEffect = SKPathEffect.CreateDash(new float[] { paintHalo.StrokeWidth, paintHalo.StrokeWidth }, paintHalo.StrokeWidth);
+                                    break;
+
+                                case UnderlineStyle.ImeConverted:
+                                    paint.PathEffect = SKPathEffect.CreateDash(new float[] { paint.StrokeWidth, paint.StrokeWidth }, paint.StrokeWidth);
+                                    paintHalo.PathEffect = SKPathEffect.CreateDash(new float[] { paintHalo.StrokeWidth, paintHalo.StrokeWidth }, paintHalo.StrokeWidth);
+                                    break;
+
+                                case UnderlineStyle.ImeTargetConverted:
+                                    paint.StrokeWidth *= 2;
+                                    paintHalo.StrokeWidth *= 2;
+                                    break;
+
+                                case UnderlineStyle.ImeTargetNonConverted:
+                                    break;
                             }
-                            ctx.Canvas.DrawText(_textBlob, 0, 0, paintHalo);
+                            // Paint solid underline
+                            if (Style.HaloColor != SKColor.Empty)
+                                ctx.Canvas.DrawLine(new SKPoint(XCoord, underlineYPos), new SKPoint(XCoord + Width, underlineYPos), paintHalo);
+                            ctx.Canvas.DrawLine(new SKPoint(XCoord, underlineYPos), new SKPoint(XCoord + Width, underlineYPos), paint);
+                            paint.PathEffect = null;
+                            paintHalo.PathEffect = null;
                         }
-
-                        ctx.Canvas.DrawText(_textBlob, 0, 0, paint);
                     }
-                }
 
-                // Paint strikethrough above text
-                if (Style.StrikeThrough != StrikeThroughStyle.None && RunKind == FontRunKind.Normal)
-                {
-                    paint.StrokeWidth = _font.Metrics.StrikeoutThickness ?? 1;
-                    if (paint.StrokeWidth < 1)
-                        paint.StrokeWidth = 1;
-                    float strikeYPos = Line.YCoord + Line.BaseLine + (_font.Metrics.StrikeoutPosition ?? 0) + glyphVOffset;
-                    ctx.Canvas.DrawLine(new SKPoint(XCoord, strikeYPos), new SKPoint(XCoord + Width, strikeYPos), paint);
+                    if (Style.HaloColor != SKColor.Empty)
+                    {
+                        // Paint strikethrough halo behind text
+                        if (Style.StrikeThrough != StrikeThroughStyle.None && RunKind == FontRunKind.Normal)
+                        {
+                            paintHalo.StrokeWidth = font.Metrics.StrikeoutThickness ?? 1;
+                            if (paintHalo.StrokeWidth < 1)
+                                paintHalo.StrokeWidth = 1;
+                            paintHalo.StrokeWidth += Style.HaloWidth;
+                            float strikeYPos = Line.YCoord + Line.BaseLine + (font.Metrics.StrikeoutPosition ?? 0) + glyphVOffset;
+                            ctx.Canvas.DrawLine(new SKPoint(XCoord, strikeYPos), new SKPoint(XCoord + Width, strikeYPos), paintHalo);
+                        }
+                        ctx.Canvas.DrawText(_textBlob, 0, 0, paintHalo);
+                    }
+
+                    ctx.Canvas.DrawText(_textBlob, 0, 0, paint);
                 }
             }
+
+            // Paint strikethrough above text
+            if (Style.StrikeThrough != StrikeThroughStyle.None && RunKind == FontRunKind.Normal)
+            {
+                paint.StrokeWidth = font.Metrics.StrikeoutThickness ?? 1;
+                if (paint.StrokeWidth < 1)
+                    paint.StrokeWidth = 1;
+                float strikeYPos = Line.YCoord + Line.BaseLine + (font.Metrics.StrikeoutPosition ?? 0) + glyphVOffset;
+                ctx.Canvas.DrawLine(new SKPoint(XCoord, strikeYPos), new SKPoint(XCoord + Width, strikeYPos), paint);
+            }
+
+            SkPaintCache.Default.ReturnReset(paint);
+            SkPaintCache.Default.ReturnReset(paintHalo);
+            SKFontCache.Default.Return(font);
         }
         
         /// <summary>
@@ -778,7 +788,7 @@ namespace Topten.RichTextKit
         }
 
         SKTextBlob _textBlob;
-        SKFont _font;
+        //SKFont _font;
 
         void Reset()
         {
@@ -787,8 +797,10 @@ namespace Topten.RichTextKit
             Style = null;
             Typeface = null;
             Line = null;
+
+            if(_textBlob != null)
+                _textBlob.Dispose();
             _textBlob = null;
-            _font = null;
         }
 
         internal static ThreadLocal<ObjectPool<FontRun>> Pool = new ThreadLocal<ObjectPool<FontRun>>(() => new ObjectPool<FontRun>()

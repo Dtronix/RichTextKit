@@ -6,9 +6,25 @@ namespace Topten.RichTextKit.Utils;
 
 internal sealed class SkTypefaceCache
 {
+    public readonly struct Metrics
+    {
+        public readonly string FamilyName;
+        public readonly int FontWeight;
+        public readonly int FontWidth;
+        public readonly SKFontStyleSlant FontSlant;
+
+        public Metrics(SKTypeface typeface, string fontFamily)
+        {
+            FamilyName = fontFamily;
+            FontWeight = typeface.FontWeight;
+            FontWidth = typeface.FontWidth;
+            FontSlant = typeface.FontSlant;
+        }
+    }
     public static SkTypefaceCache Default { get; } = new SkTypefaceCache();
 
     private readonly ConcurrentDictionary<int, SKTypeface> _cache = new();
+    private readonly ConcurrentDictionary<SKTypeface, Metrics> _metricCache = new();
 
     public void ClearCache()
     {
@@ -24,12 +40,29 @@ internal sealed class SkTypefaceCache
     {
         return _cache.GetOrAdd(style.GetHashCode() + extraWeight, i =>
         {
-            return SKTypeface.FromFamilyName(
-                style.FontFamily,
+            var familyName = style.FontFamily;
+            var typeface = SKTypeface.FromFamilyName(
+                familyName,
                 (SKFontStyleWeight)(style.FontWeight + extraWeight),
                 style.FontWidth,
                 style.FontItalic ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright
-            ) ?? SKTypeface.CreateDefault();
+            );
+            if (typeface == null)
+            {
+                typeface = SKTypeface.CreateDefault();
+            }
+            else
+            {
+                _metricCache.TryAdd(typeface, new Metrics(typeface, familyName));
+            }
+
+            return typeface;
+
         });
+    }
+
+    public Metrics GetMetrics(SKTypeface typeface)
+    {
+        return _metricCache.GetOrAdd(typeface, skTypeface => new Metrics(typeface, typeface.FamilyName));
     }
 }

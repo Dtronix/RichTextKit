@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Topten.RichTextKit.Utils;
 
 namespace Topten.RichTextKit
 {
@@ -16,8 +17,8 @@ namespace Topten.RichTextKit
 
         /// <inheritdoc />
         public SKTypeface MatchCharacter(string familyName, int weight, int width, SKFontStyleSlant slant, string[] bcp47, int character)
-        {
-            return _fontManager.MatchCharacter(familyName, weight, width, slant, bcp47, character);
+        { 
+            return _fontManager.MatchCharacter(familyName, SKFontStyleCache.Default.Get(weight, width, slant), bcp47, character);
         }
     }
 }
