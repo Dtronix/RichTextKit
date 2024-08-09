@@ -15,6 +15,9 @@
 
 using SkiaSharp;
 using System;
+using System.Collections.Generic;
+using DesignViewEngine.Platform.SpellCheck;
+using DesignViewEngine.Renderer.Text;
 
 namespace Topten.RichTextKit
 {
@@ -131,6 +134,10 @@ namespace Topten.RichTextKit
             get;
             set;
         } = SKFontHinting.Normal;
+
+        internal SpellUnderlineRange[]? SpellCheckRanges { get; set; }
+
+        internal int SpellCheckRangesPosition { get; set; } = 0;
 
         /// <summary>
         /// A default set of paint options that renders text blocks without 

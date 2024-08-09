@@ -19,6 +19,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
+using DesignViewEngine.Cache;
 using Topten.RichTextKit.Utils;
 
 namespace Topten.RichTextKit
@@ -395,16 +397,16 @@ namespace Topten.RichTextKit
             }
         }
 
+        private SKPathEffect _spellErrorEffect = SKPathEffect.CreateDash([1, 1], 1);
         /// <summary>
         /// Paint this text block
         /// </summary>
         /// <param name="canvas">The Skia canvas to paint to</param>
         /// <param name="options">Options controlling the paint operation</param>
-        public void Paint(SKCanvas canvas, TextPaintOptions options = null)
+        public void Paint(SKCanvas canvas, TextPaintOptions? options = null)
         {
             // Ensure have options
-            if (options == null)
-                options = TextPaintOptions.Default;
+            options ??= TextPaintOptions.Default;
 
             // Ensure layout done
             Layout();
@@ -415,28 +417,40 @@ namespace Topten.RichTextKit
                 Canvas = canvas,
                 Options = options,
                 DefaultTextColor = options.DefaultColor,
+                PaintBackground = SkPaintCache.Default.Rent(),
+                PaintForeground = SkPaintCache.Default.Rent(),
+                PaintHalo = SkPaintCache.Default.Rent(),
+                PaintSpellError = options.SpellCheckRanges != null ? SkPaintCache.Default.Rent() : null,
             };
+
+            ctx.PaintBackground.Style = SKPaintStyle.Fill;
+
+            if (ctx.PaintSpellError != null)
+            {
+                ctx.PaintSpellError.Style = SKPaintStyle.Stroke;
+                ctx.PaintSpellError.Color = SKColors.Red;
+                ctx.PaintSpellError.StrokeWidth = 1;
+                ctx.PaintSpellError.PathEffect = _spellErrorEffect;
+            }
 
             // Prepare selection
             if (options.Selection.HasValue)
             {
                 ctx.SelectionStart = options.Selection.Value.Minimum;
                 ctx.SelectionEnd = options.Selection.Value.Maximum;
-                ctx.PaintSelectionBackground = new SKPaint()
-                {
-                    Color = options.SelectionColor,
-                    IsStroke = false,
-                    IsAntialias = false,
-                };
+
+                ctx.PaintSelectionBackground = SkPaintCache.Default.Rent();
+                ctx.PaintSelectionBackground.Color = options.SelectionColor;
+                ctx.PaintSelectionBackground.IsStroke = false;
+                ctx.PaintSelectionBackground.IsAntialias = false;
+
                 if (options.SelectionHandleScale != 0 && options.SelectionHandleColor.Alpha > 0)
                 {
                     ctx.SelectionHandleScale = options.SelectionHandleScale;
-                    ctx.PaintSelectionHandle = new SKPaint()
-                    {
-                        Color = options.SelectionHandleColor,
-                        IsStroke = false,
-                        IsAntialias = true,
-                    };
+                    ctx.PaintSelectionHandle = SkPaintCache.Default.Rent();
+                    ctx.PaintSelectionHandle.Color = options.SelectionHandleColor;
+                    ctx.PaintSelectionHandle.IsStroke = false;
+                    ctx.PaintSelectionHandle.IsAntialias = true;
                 }
             }
             else
@@ -452,7 +466,18 @@ namespace Topten.RichTextKit
             }
 
             // Clean up
-            ctx.PaintSelectionBackground?.Dispose();
+            if(ctx.PaintSelectionBackground != null)
+                SkPaintCache.Default.ReturnReset(ctx.PaintSelectionBackground); 
+            
+            if(ctx.PaintSelectionHandle != null)
+                SkPaintCache.Default.ReturnReset(ctx.PaintSelectionHandle);  
+            
+            if(ctx.PaintSpellError != null)
+                SkPaintCache.Default.ReturnReset(ctx.PaintSpellError);
+
+            SkPaintCache.Default.ReturnReset(ctx.PaintBackground);
+            SkPaintCache.Default.ReturnReset(ctx.PaintForeground);
+            SkPaintCache.Default.ReturnReset(ctx.PaintHalo);
         }
 
         /// <summary>

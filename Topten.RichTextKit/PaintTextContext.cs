@@ -45,10 +45,14 @@ namespace Topten.RichTextKit
         public SKCanvas Canvas;
         public int SelectionStart;
         public int SelectionEnd;
-        public SKPaint PaintSelectionBackground;
-        public SKPaint PaintSelectionHandle;
+        public SKPaint? PaintSelectionBackground;
+        public SKPaint? PaintSelectionHandle;
         public float SelectionHandleScale = 1.0f;
         public TextPaintOptions Options;
         public SKColor DefaultTextColor = new SKColor(0, 0, 0, 255);
+        public SKPaint PaintBackground;
+        public SKPaint PaintForeground;
+        public SKPaint PaintHalo;
+        public SKPaint? PaintSpellError;
     }
 }
